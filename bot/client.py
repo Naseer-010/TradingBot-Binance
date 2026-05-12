@@ -132,12 +132,43 @@ class BinanceFuturesClient:
                 self._api_secret,
                 testnet=True,
             )
-            # Verify connectivity
+
+            # Phase 1: Verify network connectivity (unauthenticated)
             server_time = self._client.futures_time()
             logger.info(
-                f"Connected to Binance Futures Testnet "
-                f"(server time: {server_time.get('serverTime', 'N/A')})"
+                f"Testnet reachable (server time: {server_time.get('serverTime', 'N/A')})"
             )
+
+            # Phase 2: Verify API credentials (authenticated endpoint)
+            account = self._client.futures_account()
+            can_trade = account.get("canTrade", False)
+            if not can_trade:
+                raise BotConfigError(
+                    "API credentials are valid but trading is disabled on this account. "
+                    "Check your testnet account permissions."
+                )
+            logger.info(
+                f"Authenticated successfully — "
+                f"canTrade={can_trade}, "
+                f"balance={account.get('totalWalletBalance', '0')} USDT"
+            )
+
+        except BinanceAPIException as exc:
+            if exc.code in (-2015, -2014, -1022):
+                # Auth-specific errors
+                logger.error(f"Authentication failed: {exc.message}")
+                raise BotConfigError(
+                    f"API credentials rejected by Binance: {exc.message}. "
+                    f"Regenerate your API key/secret at https://testnet.binancefuture.com"
+                ) from exc
+            logger.error(f"Binance API error during init: {exc.message}")
+            raise BotNetworkError(
+                f"Could not connect to Binance Futures Testnet: {exc.message}"
+            ) from exc
+
+        except BotConfigError:
+            raise  # Re-raise config errors as-is
+
         except Exception as exc:
             logger.error(f"Failed to connect to Binance Testnet: {exc}")
             raise BotNetworkError(
@@ -292,8 +323,19 @@ class BinanceFuturesClient:
                     f"[{log_tag}] Binance API error (code={exc.code}): {exc.message}"
                 )
 
-                # Non-retryable errors (client mistakes)
-                if exc.code in (-1013, -1021, -1100, -1102, -1121, -2010, -2015, -4003):
+                # Non-retryable errors (client mistakes, validation failures)
+                if exc.code in (
+                    -1013,  # Invalid quantity
+                    -1021,  # Timestamp issue
+                    -1100,  # Illegal characters
+                    -1102,  # Missing mandatory parameter
+                    -1121,  # Invalid symbol
+                    -2010,  # Insufficient margin
+                    -2015,  # Invalid API key
+                    -4003,  # Quantity LOT_SIZE violation
+                    -4016,  # Price filter violation (price too high/low)
+                    -4164,  # Min notional violation (price × qty too small)
+                ):
                     raise BotAPIError(
                         f"Binance API error: {exc.message}",
                         code=exc.code,

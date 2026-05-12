@@ -1,0 +1,3 @@
+2026-05-12 11:22:19 │ INFO     │ trading_bot          │ Logging initialised → logs/trading_bot_20260512_112219.log
+2026-05-12 11:22:19 │ INFO     │ trading_bot.client   │ Initialising Binance Futures Testnet client…
+2026-05-12 11:22:19 │ ERROR    │ trading_bot.client   │ Failed to connect to Binance Testnet: HTTPSConnectionPool(host='testnet.binance.vision', port=443): Max retries exceeded with url: /api/v3/ping (Caused by NameResolutionError("HTTPSConnection(host='testnet.binance.vision', port=443): Failed to resolve 'testnet.binance.vision' ([Errno -2] Name or service not known)"))

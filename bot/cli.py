@@ -181,6 +181,10 @@ def show_order_result(result: OrderResult):
                 -2010: "Insufficient margin. Check your testnet account balance.",
                 -2015: "Invalid API key or permissions. Regenerate your testnet keys.",
                 -4003: "Quantity must comply with LOT_SIZE filter.",
+                -4016: "Price exceeds allowed range. BUY LIMIT price must be below ~105% of market price. "
+                       "Try a price closer to or below the current market price.",
+                -4164: "Order value (price × quantity) is too small — minimum is $50. "
+                       "Increase the quantity or the price.",
             }
             suggestion = suggestions.get(result.error_code)
             if suggestion:
@@ -481,17 +485,42 @@ def _interactive_place_order(client: BinanceFuturesClient):
     stop_price_val = None
 
     if order_type in ("LIMIT", "STOP_LIMIT"):
-        default_price = current_price if current_price else 50000.0
+        if current_price:
+            # BUY LIMIT: set below market (you want to buy at a discount)
+            # SELL LIMIT: set above market (you want to sell at a premium)
+            if side == "BUY":
+                default_price = round(current_price * 0.98, 2)  # 2% below market
+            else:
+                default_price = round(current_price * 1.02, 2)  # 2% above market
+        else:
+            default_price = 50000.0
+
+        # Ensure quantity meets minimum notional ($50)
+        min_qty_for_notional = 50.0 / default_price if default_price > 0 else 0.001
+        if quantity < min_qty_for_notional:
+            console.print(
+                f"  [dim yellow]⚠ Adjusting quantity from {quantity} to "
+                f"{round(min_qty_for_notional, 6)} to meet $50 minimum notional[/]"
+            )
+            quantity = round(min_qty_for_notional, 6)
+
         price = FloatPrompt.ask(
             "[cyan]Limit Price ($)[/]",
-            default=round(default_price, 2),
+            default=default_price,
         )
 
     if order_type == "STOP_LIMIT":
-        default_stop = current_price * 0.99 if current_price else 49000.0
+        if current_price:
+            # SELL stop: trigger below market; BUY stop: trigger above market
+            if side == "SELL":
+                default_stop = round(current_price * 0.99, 2)
+            else:
+                default_stop = round(current_price * 1.01, 2)
+        else:
+            default_stop = 49000.0
         stop_price_val = FloatPrompt.ask(
             "[cyan]Stop/Trigger Price ($)[/]",
-            default=round(default_stop, 2),
+            default=default_stop,
         )
 
     # Summary & confirmation
