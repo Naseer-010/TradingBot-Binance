@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "primetrade-bot"
+version = "1.0.0"
+description = "Binance Futures Testnet Trading Bot — Primetrade.ai Application Task"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Naseer"},
+]
+
+dependencies = [
+    "python-binance>=1.0.19",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "click>=8.1.0",
+]
+
+[project.scripts]
+trading-bot = "bot.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["bot*"]
